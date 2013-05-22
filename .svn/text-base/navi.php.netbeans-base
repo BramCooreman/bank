@@ -1,0 +1,40 @@
+<?php
+/// TAMKin oppimisymp‰ristˆ, Ainopankki
+/// navi.php
+/// Author: Annika Granlund, Jarmo Kortetj‰rvi
+/// created: 03.08.2010
+/// modified: 2010-01-27
+
+/*
+function isPageActive( $currentPage ) {
+	
+	if ( $_GET[ 'sivu' ] == $currentPage ) {
+		print 'class="activePage"';
+	}
+}*/
+
+	// Ainopankki, navigaatio
+	
+	print '<div id="left">
+				<ul id="navi">';		
+
+					if (isset($_SESSION[ 'Authenticated' ]) && ($_SESSION[ 'Authenticated' ] == 1)) {
+						print '
+							<li><a href="index.php" class="etusivu" >Etusivu</a></li>
+							<li><a href="index.php?sivu=uusiMaksu" class="uusiMaksu">Uusi maksu</a></li>
+							<li><a href="index.php?sivu=eraantyvatMaksut" class="eraantyvatMaksut" >Er‰‰ntyv‰t maksut</a></li>
+							<li><a href="index.php?sivu=tilitapahtumat" class="tilitapahtumat" >Tilitapahtumat</a></li>
+							<li><a href="index.php?sivu=luotonTiedot" class="luotonTiedot">Luoton tiedot</a></li>';
+							// print '<li><a href="index.php?sivu=aineistohaku" class="aineistohaku">Aineistohaku</a></li>';
+						if($_SESSION[ 'rooli' ] == 1){
+								print '<li><a href="index.php?sivu=roolinVaihto" class="roolinVaihto">Asiakasroolin vaihto</a></li>';
+							}
+						print '<li><a href=index.php?sivu=login&amp;logout=1>Kirjaudu ulos</a></li>';
+					}
+	
+	print 		'</ul><!-- /navi -->
+				<img id="naviLogo" src="images/navilogo.png" alt="Ainopankki - ainoa pankkisi" />
+			</div> <!-- /left -->
+			';
+
+?>

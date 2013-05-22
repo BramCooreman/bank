@@ -1,0 +1,12 @@
+<?php
+/// TAMKin oppimisympäristö, Ainopankki
+/// footer.php
+/// author: Annika Granlund, Jarmo Kortetjärvi
+/// created: 06.07.2010
+/// modified: 23.08.2010
+
+echo '<div id="footer">';
+	printNotification();
+echo '</div>';
+
+?>

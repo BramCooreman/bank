@@ -1,0 +1,3 @@
+<?php
+	echo "<p class='error'>Odottamaton virhe.<br>Ole hyvä ja kokeile hetken kuluttua uudelleen.<br/>Jos virhe toistuu, ota yhteyttä ylläpitoon.</p>";
+?>

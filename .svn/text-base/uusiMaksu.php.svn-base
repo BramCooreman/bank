@@ -1,0 +1,214 @@
+<?php
+/// TAMKin oppimisympäristö, Ainopankki
+/// uusiMaksu.php
+/// Annika Granlund, Jarmo Kortetjärvi
+/// created: 09.06.2010
+/// modified: 23.08.2010
+
+echo "<h1>Uusi maksu</h1>";
+
+// käyttäjä on painanut jatka- tai muuta tietoja -nappia
+if (($_POST[ 'jatka' ] || $_POST[ 'muuta' ]) && !$_POST[ 'tyhjenna' ]) {
+		
+		databaseConnect();
+		
+		// muuttujat
+		$maksunErapaiva = mysql_real_escape_string($_POST[ 'maksunErapaiva' ]);
+		$maksupvm = mysql_real_escape_string(substr($maksunErapaiva, 6, 4) . '-' . substr($maksunErapaiva, 3, 2) . '-' . substr($maksunErapaiva, 0, 2));
+		$maksajanNimi = mysql_real_escape_string($_POST[ 'maksajanNimi' ]);
+		$saajanNimi = mysql_real_escape_string($_POST[ 'saajanNimi' ]);
+		$maksaja = mysql_real_escape_string($_POST[ 'maksajanTili' ]);
+		$saaja = mysql_real_escape_string($_POST[ 'saajanTili' ]);
+		$viite = mysql_real_escape_string($_POST[ 'viite' ]);
+		$viesti = mysql_real_escape_string($_POST[ 'viesti' ]);
+		$summa = mysql_real_escape_string(str_replace(',','.',$_POST[ 'summa' ]));
+		$errorText = '';
+
+		// Syötteiden tarkistus
+		// tarkistetaan ja formatoidaan pankkitili
+		$pankkitili = $saaja;
+		require_once '../pupesoft/inc/pankkitilinoikeellisuus.php';
+		if (empty($pankkitili)) {
+			$errorText = 'Tilinumero on virheellinen, tyhjä.';
+		} else {
+			$saaja = $pankkitili;
+		}
+		
+		// maksulla on oltava viite tai viesti
+		if(!$viite && !$viesti){
+			$errorText = 'Maksulla on oltava viite tai viesti.';
+		}
+		
+		// summan pitää olla yli 0
+		if ($summa <= 0) {
+			$errorText = 'Syötä maksun summa.';
+		}
+		
+		// saajan nimi on tyhjä
+		if(!$saajanNimi){
+			$errorText = 'Anna saajan nimi.';
+		}
+			
+		// maksun määrässä voi olla vain numeroita
+		if(!isDataNumeric($summa)){
+			$errorText = 'Tarkista summa.';
+		}
+		
+		// tarkistetaan, että on rahaa maksaa maksu (jos tapahtumapäivä on nyt)
+		else if ($maksupvm == date('Y-m-d')) {
+			if ($summa > getSaldo($maksaja, $maksupvm)) {
+				// rahaa ei ole tarpeeksi
+				$errorText = 'Tilin saldo ei riitä maksuun.';
+			} else {
+				// rahaa on tarpeeksi, ei toimintoja
+			}
+		}
+		
+		// päivämäärän tarkistus
+		if(!checkDateFormat("$maksunErapaiva")){
+			$errorText = 'Tarkista päivämäärä.';
+		}
+		
+		// tarkistetaan ettei eräpäivä ole jo mennyt
+		if(strtotime($maksunErapaiva) < strtotime(date('d.m.Y'))){
+			$errorText = 'Valitsemasi eräpäivä on jo mennyt.';
+		}
+
+		// tilinumerossa voi olla vain numeroita, ei voi olla tyhjä, ei hyväksy '-' -käyttöä toistaiseksi
+		if(!ereg("[1-9]+0*", $saaja)){
+			$errorText = 'Tarkista saajan tilinumero.';
+			$saaja = '';
+		}
+		
+		// saaja ja maksaja ei voi olla sama yritys
+		else if ($saaja == $maksaja) {
+			$errorText = 'Et voi maksaa omalle tilillesi.';
+		}
+		
+		// tarkistetaan alkaako pankkitili numerolla 9
+		else if (substr($saaja, 0, 1) == 9) {
+
+			$query = "SELECT	omistaja
+			FROM	pankkitili 
+			WHERE	yhtio = 'pankk'
+			AND		tilinro = '$saaja' 
+			";
+
+			$result = mysql_query($query);
+
+			if (mysql_num_rows($result) == 0) {
+				// tilinumeroa ei ole olemassa
+				$errorText = 'Tilinumero on virheellinen.';
+			} else {
+					$row = mysql_fetch_array($result);
+			}
+		}
+		
+	}
+
+	// käyttäjä on painanut Jatka -nappia, ei virheviestiä
+	if ($_POST[ 'jatka' ] && !$errorText) {
+	
+		echo "	<div id='uusiMaksuLomake' class='content padding20'>
+				<p id='uusiMaksu'>Hyväksy maksu</p>";
+			
+		echo "<table id='hyvaksyTable'>";
+			echo getPossibleTableRow("Maksajan tili", $maksaja);
+			echo getPossibleTableRow("Maksajan nimi", $maksajanNimi, false, true);
+			echo getPossibleTableRow("Saajan tilinumero", $saaja, true);		
+			echo getPossibleTableRow("Saajan nimi", $saajanNimi, false, true);
+			echo getPossibleTableRow("Eräpäivä", $maksunErapaiva);
+			echo getPossibleTableRow("Maksun määrä", number_format($summa, 2, ',', ' '), true);
+			echo getPossibleTableRow("Viite", $viite);
+			echo getPossibleTableRow("Viesti", $viesti);
+		echo "</table>";
+		
+		echo "<form action='' method='post'>";
+			echo getPossibleHiddenField($maksupvm, "maksupvm");
+			echo getPossibleHiddenField($maksunErapaiva, "maksunErapaiva");
+			echo getPossibleHiddenField($maksajanNimi, "maksajanNimi");
+			echo getPossibleHiddenField($saajanNimi, "saajanNimi");
+			echo getPossibleHiddenField($maksaja, "maksajanTili");
+			echo getPossibleHiddenField($saaja, "saajanTili");
+			echo getPossibleHiddenField($viite, "viite");
+			echo getPossibleHiddenField($viesti, "viesti");
+			echo getPossibleHiddenField($summa, "summa");
+			
+			echo "<p id='painikkeet'>
+						<input type='submit' name='muuta' value='<< MUUTA TIETOJA' class='painike'> 
+						<input type='submit' name='hyvaksyMaksu' value='HYVÄKSY' class='painike'> 
+				</p>";
+		echo "</form></div><!-- uusimaksulomake -->";
+	}
+	else {
+	
+	// jos pvm ei ole annettu, ehdotetaan tätä päivää
+	if(!$maksunErapaiva) $maksunErapaiva = date('d.m.Y');			
+	
+	// uuden maksun syöttö -lomake
+		print ' <div id="uusiMaksuLomake" class="content padding20">
+					<p> * pakollinen kenttä<br/>** toinen kenttä pakollinen<br/><br/></p>
+					
+					<p class="errorMessage">' . $errorText . '</p>
+						<form action="" method="post" >
+							<table id="uusiMaksuKentat">
+								<tr>
+								<td>Maksetaan tililtä</td>
+								<td>' . $_SESSION[ 'tilinro' ] . '
+								<input type="hidden" name="maksajanTili" value="' . $_SESSION[ 'tilinro' ] . '" onkeypress="return disableEnterKey(event)"/></td>
+								</tr>
+								<tr>
+								<td>Maksajan nimi</td>
+								<td>' . $_SESSION['yhtionNimi'] . '
+								<input type="hidden" name="maksajanNimi" value="' . $_SESSION[ 'yhtionNimi' ] . '" onkeypress="return disableEnterKey(event)"/></td>
+								</tr>
+								<tr>
+								<td>&nbsp;</td>
+								</tr>
+								
+								<tr>
+								<td>Saajan tilinumero *</td>
+								<td>
+								<input type="text" name="saajanTili" value="' . $saaja .  '" size="20" maxlength="14" class="kentta" onkeypress="return disableEnterKey(event)"/>
+								</td>
+								</tr>
+								<tr>
+								<td>Saajan nimi *</td>
+								<td><input type="text" name="saajanNimi" value="' . $saajanNimi . '" size="20" maxlength="35" class="kentta" onkeypress="return disableEnterKey(event)"/>
+								</td>
+								</tr>
+								<tr>
+								<td>Eräpäivä *</td>
+								<td>
+								<input type="text" name="maksunErapaiva" size="10" maxlength="10" class="pvmKentta" id="date" value="' . $maksunErapaiva . '" onkeypress="return disableEnterKey(event)"/>
+									<script type="text/javascript">
+										calendar.set("date");
+									</script>
+								</td>
+								</tr>
+								<tr>
+								<td>Maksun määrä *</td>
+								<td><input type="text" name="summa" value="' . $summa . '" size="10" maxlength="19" class="kentta" id="maksunMaaraKentta" onkeypress="return disableEnterKey(event)"/>EUR</td>
+								</tr>
+								<tr>
+								<td>Viite **</td>
+								<td><input type="text" name="viite" value="' . $viite . '" size="20" maxlength="20" class="kentta" onkeypress="return disableEnterKey(event)"/></td>
+								</tr>
+								<tr>
+								<td>Viesti **</td>
+								<td><textarea class="kentta" name="viesti" rows="3" cols="1" >' . $viesti . '</textarea></td>
+								</tr>
+								<tr>
+								<td>Tilioteteksti</td>
+								<td>tilisiirto</td>
+								</tr>
+							</table>
+							
+							<p id="painikkeet">
+							<input type="submit" name="tyhjenna" value="TYHJENNÄ" class="painike"/>
+							<input type="submit" name="jatka" value="JATKA" class="painike"/>
+							</p>
+						</form>
+				</div><!-- uusiMaksuLomake -->';
+	}
+?>

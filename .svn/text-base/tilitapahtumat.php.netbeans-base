@@ -1,0 +1,271 @@
+<?php
+/// TAMKin oppimisympäristö, Ainopankki
+/// tilitapahtumat.php
+/// Author: Annika Granlund, Jarmo Kortetjärvi
+/// created: 28.07.2010
+/// modified: 1.2.2011
+	
+	echo "<h1>Tilitapahtumat</h1>";
+	
+	$errorText = '';
+	
+	// jos käyttäjä on painanut Hae -nappia
+	if ($_POST[ 'search' ]) {
+		$startDate = $_POST[ 'startdate' ];
+		$endDate = $_POST[ 'enddate' ];
+		$startDate = checkDateFormat( $startDate );
+		$endDate = checkDateFormat( $endDate );
+		
+		databaseConnect();
+		
+		// jos alkupvm ei ole annettu
+		if( $startDate == false ){
+			$errorText = "<p class='errorMessage'>Tarkista alkupäivämäärä.</p>";
+		}
+		// jos loppupvm ei ole annettu
+		if( $endDate == false ){
+			$errorText = "<p class='errorMessage'>Tarkista loppupäivämäärä.</p>";
+		}
+		
+		$today = date('d.m.Y');
+		// jos alkupvm on tulevaisuudessa
+		if( strtotime($startDate) > strtotime($today) ) {
+			$errorText = "<p class='errorMessage'>Tarkista alkupäivämäärä.</p>";
+			$startDate = false;
+		}
+		// jos lopupvm on tulevaisuudessa
+		if ( strtotime($endDate) > strtotime($today) ) {
+			$errorText = "<p class='errorMessage'>Tarkista loppupäivämäärä.</p>";
+			$endDate = false;
+		}
+		
+		if ($errorText) {
+			print $errorText;
+		}
+
+		// jos alku- ja loppupvm:t on annettu ja errorText on tyhjä, haetaan tilitapahtumat
+		if( $startDate != false and $endDate != false and empty($errorText) ) {
+
+			$yhtio = $_SESSION[ 'yhtionNimi' ];
+			$ytunnus = $_SESSION[ 'ytunnus' ];
+		
+			if(strtotime($endDate) > strtotime(date('d.m.Y'))){
+				//$endDate = date('d.m.Y');
+			}
+
+			print '<p class="yhtionTiedot"><strong>' . $yhtio . '</strong></p>';
+		
+			$query = "	SELECT		*
+						FROM		pankkitili
+						WHERE 		ytunnus = '$ytunnus' 
+						";
+			$result = mysql_query($query) or pupe_error($query);
+		
+			if (mysql_num_rows($result) == 0) {
+				echo "<p>Pankkitiliä ei löydy</p>";
+			}
+			else {
+				$row = mysql_fetch_array($result);
+				$tilinro = $row[ 'tilinro' ];
+			
+				echo "<table class='tilinTiedot'><tr><td>Tilinro:</td><td> $tilinro</td></tr>";
+			
+				echo "<tr><td>Tilitapahtumat aikavälillä </td><td>$startDate - $endDate</td></tr></table>";
+					
+				$startDateMySql = date( 'Y-m-d', strtotime($startDate) );
+				$endDateMySql = date( 'Y-m-d', strtotime( $endDate ) );
+
+				// TODO: eiVaikutaSaldoon-ehdot kuntoon
+				$query = "	SELECT	tapvm
+									, saajanNimi
+									, maksajanNimi
+									, summa
+									, selite
+									, viite
+									, maksaja
+							FROM	pankkitapahtuma
+							WHERE	(saaja = '$tilinro' OR maksaja = '$tilinro')
+							AND		(tapvm >= '$startDateMySql' AND tapvm <= '$endDateMySql')
+							AND		(eiVaikutaSaldoon = ''
+									OR eiVaikutaSaldoon IS NULL
+									OR eiVaikutaSaldoon = 'l'
+									OR eiVaikutaSaldoon = 'a'
+									OR eiVaikutaSaldoon = 'k'
+									OR eiVaikutaSaldoon = 'm'
+									)
+							ORDER BY tapvm ASC
+							";
+						//CONCAT_WS(' ',viite,selite) AS selite	
+				$result = mysql_query($query) or pupe_error($query);
+			
+				if (mysql_num_rows($result) == 0) {
+					echo "<div id='tilitapahtumat'>
+						<p>Tilitapahtumia ei löydy aikavälillä $startDate - $endDate !</p>
+						";
+						
+				} else {
+
+					$dateTable = explode(".", $startDate);
+					$yesterday = mktime(0, 0, 0, $dateTable[1]  , $dateTable[0] -1, $dateTable[2] );
+				
+					echo "	<div class='content'>
+						<table id='tilioteTable'>
+							<tr>
+								<th>Tap.pvm</th>
+								<th>Saajan nimi</th>
+								<th>Maksajan nimi</th>
+								<th>Summa</th>
+								<th>Viite, selite</th>
+							</tr>
+							<tr>
+								<td></td>
+								<td></td>
+								<td>Alkusaldo $startDate</td>";
+								
+					// etumerkki alkusaldoon
+						$tempSaldo = getSaldo($tilinro, date('Y-m-d', $yesterday));
+							if($tempSaldo>=0){
+								$tempSaldo = "+".$tempSaldo;
+							}
+						
+					echo "		<td class='alignRight'>$tempSaldo</td>
+								<td></td>
+							</tr>
+						";
+				
+					$tilinSaldoAikavalilla = 0;
+				
+					// tulostetaan sql-kyselystä saadut tulokset
+					$i = 1;
+					while($row = mysql_fetch_array($result)) {
+						$tapvm = $row[ 'tapvm' ];
+						$saajanNimi = $row[ 'saajanNimi' ];
+						$maksajanNimi = $row[ 'maksajanNimi' ];
+						$summa = $row[ 'summa' ];
+						$selite = $row[ 'selite' ];
+						$viite = $row[ 'viite' ];
+						if ( !empty($viite) ) {
+							$viite = $viite . ",<br/>";
+						}
+						$maksaja = $row[ 'maksaja' ];
+					
+						echo "<tr";
+							if ($i%2 == 1) echo " class='oddRow'";
+							$i++;
+						echo ">
+								<td>".date('d.m.Y',strtotime($tapvm))."</td>
+								<td>$saajanNimi</td>
+								<td>$maksajanNimi</td>
+							";
+					
+						// jos laskun maksaja on sama kuin yrityksen oma tili, on kyse maksusta (eli tulostetaan miinusmerkki)
+						if ($row[ 'maksaja' ] == $tilinro) {
+							echo "<td class='alignRight'>-$summa</td>";
+							$tilinSaldoAikavalilla = $tilinSaldoAikavalilla - $summa;
+						} else {
+							echo "<td class='alignRight'>+$summa</td>";
+							$tilinSaldoAikavalilla = $tilinSaldoAikavalilla + $summa;
+						}
+					
+						echo "
+								<td>$viite $selite</td>
+							</tr>
+							";
+					}
+				echo "<tr>
+						<td></td>
+						<td></td>
+						<td>Tapahtumat yhteensä</td>
+						<td class='alignRight'>".number_format($tilinSaldoAikavalilla,2,'.',' ')."</td>
+						<td></td>
+					</tr>
+					<tr>
+						<td></td>
+						<td></td>
+						<td>Tilin saldo " . $endDate ."</td>";
+				
+				// etumerkki saldoon
+				$tempSaldo = getSaldo($tilinro, date('Y-m-d', strtotime($endDate)));
+				if($tempSaldo>=0){
+					$tempSaldo = "+".$tempSaldo;
+				}
+				
+				echo "
+						<td class='alignRight'>$tempSaldo</td>
+						<td></td>
+					</tr>
+					</table>";
+				}
+			
+				/*
+				if($tilinSaldoAikavalilla >= 0) {
+					echo "+";
+					}*/
+			
+				$tilinSaldo = getSaldo($tilinro, date('Y-m-d'));
+			
+				echo "<table class='tilinSaldot'>";
+
+				echo "<tr><td>Tilin saldo ".date('d.m.Y').": </td><td>";
+					if($tilinSaldo >= 0) {
+						echo "+";
+					}
+				echo "$tilinSaldo euroa</td></tr></table>";
+				echo "</div><!-- /tilitapahtumat -->
+						<p><a class='painike' href='index.php?sivu=tilitapahtumat'>Takaisin</a></p>";
+			}
+		}
+		else {
+			if($startDate == false && $endDate == false){
+				printTimeFrameSearchForm();
+			}
+			elseif($startDate == false){
+				printTimeFrameSearchForm(false, $endDate);
+			}
+			elseif($endDate == false){
+				printTimeFrameSearchForm($startDate);
+			}
+		}
+	} 
+	else {
+		printTimeFrameSearchForm();
+	}
+	
+	function printTimeFrameSearchForm($startDate = false, $endDate = false) {
+
+		// tilitietojen aikavälin hakulomake
+		print '	<div id="login" class="content">
+				<h2>Hae aikaväliltä</h2>
+					<div id="kirjaudulomake">
+						<form action="" method="post">
+							<p>Syötä tiedot muodossa pp.kk.vvvv</p>
+							<table id="authentication">
+							<tr>
+							<td>alkupvm</td>
+							<td>
+							<input type="text" name="startdate" id="startdate" value="' . $startDate . '" />
+							<script type="text/javascript">
+								calendar.set("startdate");
+							</script>
+							</td>
+							</tr>
+							<tr>
+							<td>loppupvm</td>
+							<td>
+							<input type="text" name="enddate" id="enddate" value="' . $endDate . '" />
+							<script type="text/javascript">
+								calendar.set("enddate");
+							</script>
+							</td>
+							</tr>
+							</table>
+							<p id="painikkeet">
+							<input type="submit" name="search" value="HAE" class="painike"/>
+							<input type="reset" value="TYHJENNÄ" class="painike"/>
+							</p>
+						
+						</form>
+					</div><!-- /kirjaudu -->
+				</div><!-- /login -->';
+	} // end of function printTimeFrameSearchForm()
+?>

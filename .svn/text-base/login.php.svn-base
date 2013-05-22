@@ -1,0 +1,89 @@
+<?php
+/// TAMKin oppimisymp‰ristˆ, Ainopankki
+/// login.php
+/// Author: Annika Granlund, Jarmo Kortetj‰rvi
+/// created: 03.08.2010
+/// modified: 23.08.2010
+
+echo "<div id='loginbar'>";
+
+	if (isset($_POST[ 'login' ])) {
+	
+		if ( (isset($_POST[ 'username' ])) && (!empty($_POST[ 'username' ])) 
+		&& (isset($_POST[ 'password' ])) && (!empty($_POST[ 'password' ])) ) {
+			databaseConnect();
+			// k‰ytt‰j‰tunnus ja salasana muuttujiin
+			$userName = mysql_real_escape_string($_POST[ 'username' ]);
+			$password = mysql_real_escape_string($_POST[ 'password' ]);
+			
+			$query = "	SELECT		kuka.kuka 			AS 'kuka' 
+									, kuka.salasana 	AS 'salasana' 
+									, yhtio.ytunnus 	AS 'ytunnus' 
+									, yhtio.nimi 		AS 'yhtionNimi' 
+									, pankkitili.tilinro AS 'tilinro' 
+									, kuka.profiilit	AS 'profiili'
+						FROM		kuka 
+						JOIN		yhtio
+						ON			kuka.yhtio = yhtio.yhtio 
+						JOIN		pankkitili
+						ON			yhtio.ytunnus = pankkitili.ytunnus
+						WHERE		kuka.kuka = '$userName' 
+						; ";
+						
+			$resultSet = mysql_query($query);
+			
+			// check if there is information in DB
+			$num_rows = mysql_num_rows($resultSet);
+			
+			// DB is empty, user name not found
+			if ( $num_rows == 0 ) {
+				$_SESSION[ 'Authenticated' ] = 0;
+				//print '<p>Tietokannassa ei ole tietoa.</p>';
+			} 
+			// DB has information, user name found
+			else {
+				$row = mysql_fetch_assoc($resultSet);
+				//$id = $row[ 'id' ];
+				$passwordFromDB = utf8_encode( $row[ 'salasana' ] );
+				
+				if ($passwordFromDB == md5($password)) {
+					$_SESSION[ 'Authenticated' ] = 1;
+					$_SESSION[ 'ytunnus' ] = $row[ 'ytunnus' ];
+					$_SESSION[ 'yhtionNimi' ] = $row[ 'yhtionNimi' ];
+					$_SESSION[ 'kayttaja' ] = $row[ 'kuka' ];
+					$_SESSION[ 'tilinro' ] = $row[ 'tilinro' ];
+					
+					if($row[ 'profiili' ] == 'Admin profil'){
+						$_SESSION[ 'rooli' ] = 1;
+					}
+					
+				} else {
+					$_SESSION[ 'Authenticated' ] = 0;
+				}
+			}
+		}
+		session_write_close();
+		header("Location: index.php");
+	}
+
+
+
+	if (isset($_GET[ 'logout' ])) {
+		session_destroy();
+		header("Location: index.php");
+	}
+
+
+// kayttaja on kirjautunut sisaan
+	if($_SESSION[ 'Authenticated' ] == 1){
+		echo "<p>Kirjautuneena sis&auml;&auml;n: <br/><strong>" . $_SESSION['yhtionNimi'] . " / " . $_SESSION[ 'kayttaja' ] . "</strong></p>";
+		echo "<p><a href=index.php?sivu=login&amp;logout=1>Kirjaudu ulos</a></p>";
+		}
+// kayttaja ei ole kirjautunut sisaan
+	else{
+		echo "<p>Et ole kirjautuneena sis&auml;&auml;n</p>";
+		echo "<p><a href=index.php>Kirjaudu sis‰‰n</a></p>";
+	}
+	
+?>
+</div> <!-- /loginbar -->

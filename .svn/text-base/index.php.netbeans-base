@@ -1,0 +1,89 @@
+<?php
+/// TAMKin oppimisympäristö, Ainopankki
+/// index.php
+/// Annika Granlund, Jarmo Kortetjärvi
+/// created: 28.05.2010
+/// modified: 23.08.2010
+
+ini_set("session.gc_maxlifetime", "1800"); 
+session_set_cookie_params(1800);
+session_name("ainopankki");
+session_start();
+
+require_once 'functions.php';
+validateSession();
+
+// Siirretään käyttäjä kirjautumissivulle, jos autentikointia ei ole tehty (sessio vanhentunut tms.)
+if($_GET[ 'sivu' ] && $_SESSION[ 'Authenticated' ] != 1){
+	header("Location: index.php");
+	exit;
+}
+
+// Kirjataan käyttäjä ulos
+if (isset($_GET[ 'logout' ])) {
+	session_destroy();
+	header("Location: index.php");
+	exit;
+}
+
+// Tallennetaan uusi maksu tietokantaan
+if ($_POST['hyvaksyMaksu']){
+	require_once 'hyvaksyMaksu.php';
+}
+
+// Haetaan viiteaineisto ja tulostetaan se tekstitiedostona
+if ( $_POST[ 'haeViiteaineisto' ] ) {
+	require( 'saapuvatViitemaksut.php' );
+	exit;
+}
+
+// Haetaan konekielinen tiliote ja tulostetaan se tekstitiedostona
+if ( $_POST[ 'haeTiliote' ] ) {
+	require( 'konekielinenTiliote.php' );
+	exit;
+}
+
+// Vaihdetaan asiakasroolia
+if ( $_POST[ 'vaihdaRooli' ] ) {
+	require( 'roolinVaihto.php' );
+}
+
+header("Content-Type: text/html; charset=ISO-8859-1"); 
+	echo '<?xml version="1.0" encoding="ISO-8859-1"?>';
+
+
+?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="fi" lang="fi">
+
+	<head>
+		<title>Ainopankki</title>
+		<link rel="stylesheet" type="text/css" href="css/ainopankki_style.css"/>
+		<link rel="shortcut icon" href="images/aino_favicon.png" />
+		
+		<script src="../lib/calendar/calendar.js" type="text/javascript"></script>
+		<link href="../lib/calendar/calendar.css" type="text/css" rel="stylesheet" />
+		<script src="../lib/js/disable_enter.js" type="text/javascript"></script>
+		<script src="../lib/js/confirm.js" type="text/javascript"></script>
+	</head>
+	
+	<?php
+		$sivu = $_GET[ 'sivu' ];
+		if ( empty($sivu) ) {
+			$sivu = 'etusivu';
+		}
+		print '<body class="' . $sivu . '">';
+	?>
+		<div id="pohja">
+	
+			<?php
+				require_once 'header.php';
+				require_once 'login.php';
+				require_once 'navi.php';
+				require_once 'content.php';
+				require_once 'footer.php';
+			?>
+		</div><!-- /pohja -->
+	
+	</body>
+</html>

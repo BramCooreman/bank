@@ -1,0 +1,428 @@
+<?php
+/// TAMKin oppimisymp‰ristˆ, Ainopankki
+/// tarkistaLyhennys.php
+/// Jarmo Kortetj‰rvi
+/// created: 25.08.2010
+/// modified: 10.03.2010
+
+//TODO: TARKISTA KƒYTT÷OIKEUDET TƒHƒN TIEDOSTOON
+
+	require_once 'functions.php';
+	databaseConnect();
+
+// haetaan kaikkien lainojen tiedot
+$query = "		SELECT * 
+				FROM lainantiedot
+				JOIN pankkitapahtuma
+				ON pankkitapahtuma.arkistotunnus = lainantiedot.arkistotunnus
+				WHERE saaja != '99912300014493'
+				AND lainantiedot.maksuera > 0
+				AND lainantiedot.korkomarginaali > 0
+			";
+$lainaresult = mysql_query($query);
+
+// k‰yd‰‰n l‰pi jokainen laina
+while($lainarow = mysql_fetch_assoc($lainaresult)){
+	static $nu = 0;
+	$nu++;
+
+	// jos kyseess‰ on euribor-korkoon sidottu laina, tarkistetaan korko
+	$korkotyyppi = $lainarow['korkotyyppi'];
+	if($korkotyyppi >= 2 && $korkotyyppi <= 4){
+
+		// tarkistetaan onko korkoprosentti vanhentunut
+		$paivitetty = $lainarow['euribor'];
+		$korkoid = $lainarow['id'];
+		$paivitetaan = 0;
+		
+		// euriboria ei ole asetettu aiemmin
+		if($paivitetty == null){
+			$paivitetaan = 1;
+		}
+		else{
+			// lasketaan kuinka vanha korkoprosentti on
+			switch($korkotyyppi){
+				case 2: // 3kk euribor
+					$voimassa = 3;
+					break;
+				case 3: // 6kk euribor
+					$voimassa = 6;
+					break;
+				case 4: // 12kk euribor
+					$voimassa = 12;
+					break;
+			}
+			
+			$paivitetty = strtotime($paivitetty);
+			$nyt = strtotime('now');
+			$age = ($nyt - $paivitetty) / 86400;
+			
+			// korkoprosentti on p‰ivitett‰v‰
+			// TODO: $voimassa*30 ei ole oikein
+			if($age>($voimassa*30)) $paivitetaan = 1;
+		}
+		
+		// p‰ivitet‰‰n korkoprosentti
+		if($paivitetaan == 1){
+			require_once 'tarkistaEuribor.php';
+			$newrate = getRssRate($voimassa);
+			if($newrate){
+				$update = "	UPDATE lainantiedot
+							SET	
+							euribor = now()
+							, korko	= $newrate
+							WHERE id = $korkoid
+						";
+						
+				echo "$nu. $lainarow[saajanNimi] - p‰ivitetty euribor $newrate.\n";
+				mysql_query($update);
+			}
+			else echo "$nu. $lainarow[saajanNimi] - uutta korkoprosenttia ei voitu hakea.\n";
+		}
+	}
+	
+	// tilin saldo
+	$tilinsaldo = getSaldo($lainarow['saaja'], 'now()');
+	
+	// lasketaan maksuer‰
+		
+		// muuttujat
+			$arkistotunnus	= $lainarow['arkistotunnus'];
+			$kokolaina 		= $lainarow['summa'];
+			$korko 			= $lainarow['korko']+$lainarow['korkomarginaali'];
+			$maksuera		= $lainarow['maksuera'];
+			$lainatyyppi 	= $lainarow['tyyppi'];
+			$lainapvm		= $lainarow['tapvm'];
+			
+		if($korko==0){
+			echo "Virheellinen korko!"; 
+			break;
+		}
+		
+		// lyhennykset
+			$laina = $kokolaina;
+			for($i=0;$laina>0;$i++){
+				$kkkorko 	= $laina * ($korko/100/12);
+				
+				// tasalyhennys
+				if($lainatyyppi == 1){
+					$lyhennys 	= $maksuera;
+				}
+				// kiinte‰ tasaer‰
+				elseif($lainatyyppi == 2){
+					$lyhennys 	= $maksuera-$kkkorko;
+				}
+				
+				// lyhennys on suurempi kuin j‰ljell‰oleva laina
+				if($laina<$lyhennys){
+					$lyhennys = $laina;
+				}
+				//echo "lyhennys=$lyhennys<br/>";
+				
+				$laina = $laina - $lyhennys;
+			}
+		
+	// tarkistetaan onko maksueri‰, joista ei ole merkint‰‰ lainatapahtuma-taulussa
+		$thismonth = date('Ym');
+		
+		// tehd‰‰n lainatapahtuma-tauluun merkint‰ uusista maksuerist‰
+		$continue = 1; 
+		
+		while($continue == 1){
+			// haetaan lainan viimeisin maksuer‰
+				$query = "	SELECT *
+							, DATE_FORMAT(maksupvm, '%Y%m') AS lastmonth
+							FROM lainatapahtuma
+							WHERE arkistotunnus = '$arkistotunnus'
+							ORDER BY maksupvm DESC
+							LIMIT 1;
+							";
+				
+				$result = mysql_query($query);
+				
+				// query ei onnistu
+				if(!$result){
+					echo "Virhe kyselyss‰: $query";
+					$continue = 0;
+				}
+				
+				$maksuerarow = mysql_fetch_assoc($result);
+				
+				// yht‰‰n lainatapahtumaa ei viel‰ ole
+				$numrows = mysql_num_rows($result);
+				if($numrows==0){
+					$paymentmonth = $lainapvm;
+				}
+				elseif($maksuerarow['maksupvm']){
+					$paymentmonth = $maksuerarow['maksupvm'];
+				}
+				// lastmonth muotoon yyyymm
+				$lastmonth = strtotime(date("Y-m-d", strtotime($paymentmonth)) . "+1 month");
+				$lastmonth = date('Ym', $lastmonth);
+			
+				// Tehd‰‰n lainatapahtumat
+				if($lastmonth <= $thismonth){
+					// kaikki maksetut er‰t
+						$eraquery = "SELECT SUM(lyhennys) AS maksetut FROM lainatapahtuma WHERE arkistotunnus = '$arkistotunnus'";
+						$maksetutrow = mysql_fetch_assoc(mysql_query($eraquery));
+					
+					$lainaajaljella = $kokolaina - $maksetutrow['maksetut'];
+					$kkkorkop = $korko / 12 / 100;
+					$kkkorko = round($lainaajaljella*$kkkorkop,2);
+					
+					// tasalyhennys
+					if($lainatyyppi == 1){
+						$lyhennys 	= $maksuera;
+					}
+					// kiinte‰ tasaer‰
+					elseif($lainatyyppi == 2){
+						$lyhennys 	= $maksuera-$kkkorko;
+					}
+					// lyhennys on suurempi kuin j‰ljell‰oleva laina
+					if($kokolaina<$lyhennys){
+						$lyhennys = $kokolaina;
+					}
+					
+					// teht‰v‰ kuukausi
+					$paymentmonth = strtotime(date("Y-m-d", strtotime($paymentmonth)) . "+1 month");
+					$paymentmonth = date('Y-m-d', $paymentmonth);
+					
+					// tehd‰‰n viimeist‰ maksuer‰‰ seuraavalle kuukaudelle suoritus
+						$query = "	INSERT INTO lainatapahtuma
+									(
+									arkistotunnus
+									, lyhennys
+									, korko
+									, maksupvm
+									, suoritettu
+									, korkoprosentti
+									)
+									VALUES
+									(
+									'$arkistotunnus'
+									, $lyhennys
+									, $kkkorko
+									, '$paymentmonth'
+									, 0
+									, $korko
+									)
+								";
+					$result = mysql_query($query);
+				}
+				else{
+					$continue = 0;
+					break;
+				}
+		}
+	
+	// -------------------------------------------------------------------------- //
+	
+	// tarkistetaan onko maksamattomia lainaeri‰
+		$query = "	SELECT *
+							, lainatapahtuma.id AS tunniste
+							, DATE_FORMAT(lainatapahtuma.maksupvm, '%m/%Y') AS erapvm
+							, lainatapahtuma.korko AS korko
+					FROM lainatapahtuma
+					JOIN pankkitapahtuma
+					ON lainatapahtuma.arkistotunnus = pankkitapahtuma.arkistotunnus
+					JOIN lainantiedot
+					ON lainantiedot.arkistotunnus = lainatapahtuma.arkistotunnus
+					WHERE suoritettu = 0
+					AND	lainatapahtuma.arkistotunnus = '$arkistotunnus'
+					ORDER BY maksupvm DESC
+					";
+		$maksamatonresult = mysql_query($query);
+	
+	// maksamattomia lainaeri‰ lˆytyy
+		$numrows = mysql_num_rows($maksamatonresult);
+		if($numrows > 0){
+
+			while($maksamaton = mysql_fetch_assoc($maksamatonresult)){
+				// Tarkistetaan onko tilill‰ katetta maksaa
+				
+					// er‰n kasvama korko
+					$maksuera 		= $maksamaton['maksuera'];
+					$lyhennysera	= $maksamaton['lyhennys'];
+					$korkoera 		= $maksamaton['korko'];
+					$erapvm 		= $maksamaton['erapvm'];
+					
+					// lasketaan paljonko maksu on myˆh‰ss‰
+					$maksupvm 	= strtotime($maksamaton['maksupvm']);
+					$suorituspvm = strtotime(date("Y-m-d"));
+					$myohassa = $suorituspvm - $maksupvm;
+					$myohassa = $myohassa / 86400;
+					
+					$tempkorko 	= $maksamaton['korkoprosentti'];
+					
+					$viivastyskorko = round(($maksuera*$tempkorko*$myohassa)/(100*365), 2);
+					
+					$maksamatta = $maksuera;
+						
+					// tilill‰ on katetta
+					if($maksamatta < $tilinsaldo){
+						// maksetaan lasku tililt‰
+						// kent‰t
+							$query = 
+							"	INSERT INTO pankkitapahtuma
+								(
+									yhtio
+									, saaja
+									, saajanNimi
+									, maksaja
+									, maksajanNimi
+									, summa
+									, tapvm
+									, kurssi
+									, valkoodi
+									, viite
+									, selite
+									, arkistotunnus
+									, laatija
+									, luontiaika
+									, eiVaikutaSaldoon
+								)
+								VALUES
+							";
+							
+						// lyhennyksen osuus
+							$maksutunnus = getArchiveReferenceNumber();
+							$query .=	
+							"
+								(
+								'pankk'
+								, '$lainarow[maksaja]'
+								, '$lainarow[maksajanNimi]'
+								, '$lainarow[saaja]'
+								, '$lainarow[saajanNimi]'
+								, '$lyhennysera'
+								, now()
+								, 1
+								, 'EUR'
+								, '$lainarow[viite]'
+								, 'Lainan lyhennys, $erapvm'
+								, '$maksutunnus'
+								, 'automaatti'
+								, now()
+								, 'a'
+								)";
+						// koron osuus
+						if($korkoera>0){
+						$maksutunnus = getArchiveReferenceNumber();
+						$query .= 
+							"
+							,(
+							'pankk'
+							, '$lainarow[maksaja]'
+							, '$lainarow[maksajanNimi]'
+							, '$lainarow[saaja]'
+							, '$lainarow[saajanNimi]'
+							, '$korkoera'
+							, now()
+							, 1
+							, 'EUR'
+							, '$lainarow[viite]'
+							, 'Lainan korko, $erapvm'
+							, '$maksutunnus'
+							, 'automaatti'
+							, now()
+							, 'k'
+							)";
+						}
+						$result = mysql_query($query);
+						
+						if($viivastyskorko>0){
+							// maksetaan lainaer‰n viiv‰styskorot
+								$maksutunnus = getArchiveReferenceNumber();
+							
+								$query = 
+								"	INSERT INTO pankkitapahtuma
+									SET
+										yhtio = 'pankk',
+										saaja='$lainarow[maksaja]',
+										saajanNimi = '$lainarow[maksajanNimi]',
+										maksaja='$lainarow[saaja]',
+										maksajanNimi = '$lainarow[saajanNimi]',
+										summa='$viivastyskorko',
+										tapvm=now(),
+										kurssi=1,
+										valkoodi = 'EUR',
+										viite = '$lainarow[viite]',
+										selite = 'Lainan viiv‰styskorko, $erapvm',
+										arkistotunnus = '$maksutunnus', 
+										laatija='automaattimaksu',
+										luontiaika=now(),
+										eiVaikutaSaldoon = 'm'
+								";
+							$result = mysql_query($query);
+							
+						// merkit‰‰n viiv‰styskorot lainatapahtumiin
+						$query = "	INSERT INTO lainatapahtuma
+									(
+									arkistotunnus
+									, korko
+									, suorituspvm
+									, suoritettu
+									, korkoprosentti
+									)
+									VALUES
+									(
+									'$arkistotunnus'
+									, '$viivastyskorko'
+									, now()
+									, 1
+									, $korko
+									)
+								";
+						$result = mysql_query($query);
+						}
+						
+						
+						// p‰ivitet‰‰n lasku maksetuksi
+							$query = "	UPDATE lainatapahtuma
+										SET suoritettu = 1, suorituspvm=now()
+										WHERE id = $maksamaton[tunniste]";
+						$result = mysql_query($query);
+					}
+				// tilill‰ ei ole katetta
+				else {
+					// Tarkistetaan onko huomautusmaksu jo tehty
+					$query = "	SELECT maksupvm
+								FROM lainatapahtuma
+								WHERE date_format(maksupvm, '%m/%Y') = '$erapvm'
+								AND arkistotunnus = '$arkistotunnus'
+								AND korkoprosentti IS NULL
+								AND lyhennys IS NULL
+							";
+					$result = mysql_query($query);
+					$rows = mysql_num_rows($result);
+					
+					if($rows > 0){
+						// Ei tehd‰ mit‰‰n, huomautusmaksu on jo tehty
+						}
+					else {
+						// Huomautusmaksu
+						$query = "	INSERT INTO lainatapahtuma
+									(
+									arkistotunnus
+									, korko
+									, suorituspvm
+									, suoritettu
+									, maksupvm
+									)
+									VALUES
+									(
+									'$arkistotunnus'
+									, 5
+									, now()
+									, 1
+									, '$maksamaton[maksupvm]'
+									)
+								";
+						$result = mysql_query($query);
+					}
+				}
+			}
+		}
+}
+
+?>

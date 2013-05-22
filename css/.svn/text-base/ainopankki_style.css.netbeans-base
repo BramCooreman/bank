@@ -1,0 +1,388 @@
+/*/ 
+/// TAMKin oppimisympäristö, Ainopankki
+/// ainopankki_style.php
+/// Annika Granlund, Jarmo Kortetjärvi
+/// created: 28.05.2010
+/// modified: 01.02.2011
+/*/
+
+/* *** DEFAULT SETTINGS OFF *** */
+html, body, ul, ol, li, p, h1, h2, h3, h4, h5, h6, form, fieldset, a, hr{
+margin: 0;
+padding: 0;
+border: 0;
+}
+body {
+font-size: 100.01%; /* Fix for some browser bugs */
+background-color: #ffffff;
+}
+h1, h2, h3, h4, h5, h6 {
+font-weight: normal;
+font-size: 100%;
+}
+
+/* *** END OF DEFAULT SETTING OFF *** */
+
+body {
+	background-color: #111;
+	font-family: Arial, Verdana, sans-serif;
+}
+
+/* pohja */
+#pohja {
+	width: 800px;
+	margin: 0 auto;
+	background-color: white;
+	background-image: url(../images/background.png);
+	background-repeat: no-repeat;
+	background-position: bottom;
+}
+
+/* header-kuva */
+#ainoLogo {
+	width: 200px;
+	margin: 20px;
+	float: left;
+}
+
+/* sisältölaatikot */
+.content{
+	border: 1px solid #c7ccb0;
+	background-color: #d4e9ca;
+	margin-left: 0px;
+	padding-bottom: 20px;
+	margin-bottom: 5px;
+}
+
+/* *** ylä- ja alapalkit **** */
+.palkki {
+	width: 800px;
+	height: 25px;
+	background-image: url(../images/divider.png);
+	background-repeat: repeat-x;
+	border: 3px solid c7ccb0;
+	clear: both;
+}
+
+.notification {
+	text-align: center;
+	width: 800px;
+	color: #eee;
+	font-weight: bold;
+	background-color: rgba(0,0,0,0.60);
+}
+
+/* *** ylä- ja alapalkit loppuu *** */
+
+/* kirjautuminen.php kirjautumislomake */
+#login  {
+	/*height: 260px;*/
+	width: 300px;
+}
+
+#login #tervetuloa {
+	font-weight: bold;
+	padding: 20px;
+	padding-bottom: 40px;
+}
+
+#login #kirjaudulomake {
+	margin-left: 20px;
+	font-size: 12px;
+}
+
+#login #kirjaudu {
+	font-size: 14px;
+	padding-bottom: 20px;
+}
+
+.kentta {
+	border: 1px solid #c7ccb0;
+	width: 180px;
+}
+
+.pvmKentta {
+	border: 1px solid #c7ccb0;
+}
+
+.painike {
+	border: 1px solid #7c806e;
+	font-size: 10px;
+	background-color: #8cc63f;
+	color: #000;
+	padding: 5px;
+}
+/* *** Takaisin-painikkeet *** */
+.painike:link, .painike:visited {
+	text-decoration: none;
+}
+.painike:hover{
+	color: #fff;
+}
+
+#login #painikkeet{
+	margin-top: 30px;
+	float: right;
+	margin-right: 8px;
+}
+.notValid{
+	font-weight: bold;
+	color: #ba0000;
+	padding-bottom: 5px;
+}
+
+/* *** kirjautumisen tilapalkki *** */
+#loginbar{
+	float: right;
+	display: block;
+	width: 200px;
+	height: 120px;
+}
+#loginbar p{
+	font-size: 12px;
+}
+#loginbar a:link, #loginbar a:visited {
+	color: #000;
+	text-decoration: none;
+	font-size: 12px;
+}
+#loginbar a:hover{
+	color: #c1d62f;
+}
+
+/* *** kirjautuminen loppuu *** */
+
+/* *** uusiMaksu.php *** */
+#uusiMaksuLomake #uusiMaksu {
+	font-weight: bold;
+	/*padding: 20px;*/
+	padding-bottom: 30px;
+	font-size: 14px;
+}
+
+#uusiMaksuLomake #painikkeet {
+	margin-top: 30px;
+	float: right;
+}
+
+#uusiMaksuLomake {
+	font-size: 12px;
+	width: 350px;
+}
+
+#uusiMaksuLomake #uusiMaksuKentat {
+	margin-left: 20px;
+}
+
+#maksunMaaraKentta {
+	width: 150px;
+}
+
+#hyvaksyTable{
+
+	margin-bottom: 20px;
+	padding: 20px;
+	width: 370px;
+}
+#hyvaksyTable .breaker td{
+	padding-bottom: 20px;
+}
+
+/* *** NAVIGAATIO *** */
+/* navi.php navigaatiopalkki */
+#left {
+	float: left;
+	clear: both;
+	margin-left: 20px;
+	margin-bottom: 150px;
+	width: 198px;
+	border: 1px solid #c7ccb0;
+	background-color: #fff;
+}
+
+#naviLogo {
+	padding: 20px 0px 0px 25px;
+}
+
+#navi {
+	
+}
+
+#navi ul {
+}
+  
+#navi li {
+	list-style-type: none;
+	padding-top: 20px;
+}
+
+/* Background color for selected link in main navigation */			  
+body.etusivu ul#navi a.etusivu, 
+body.uusiMaksu ul#navi a.uusiMaksu, 
+body.eraantyvatMaksut ul#navi a.eraantyvatMaksut, 
+body.tilitapahtumat ul#navi a.tilitapahtumat, 
+body.luotonTiedot ul#navi a.luotonTiedot, 
+body.aineistohaku ul#navi a.aineistohaku, 
+body.roolinVaihto ul#navi a.roolinVaihto {
+	color: #c1d62f;
+	font-weight: bold;
+}
+
+#navi a:link, #navi a:visited {
+	color: black;
+	width: 150px;
+	height: 20px;
+	text-decoration: none;
+	font-size: 15px;
+	float: left;
+	padding-left: 28px;
+	padding-top: 5px;
+}
+
+#navi a:hover {
+	color: #c1d62f;
+	font-weight: bold;
+}
+
+/* *** Navigaatio loppuu *** */
+
+#content {
+	float: left;
+	width: 543px;
+	padding-left: 20px;
+}
+
+#footer {
+	padding-top: 50px;
+	clear: both;
+}
+
+/* *** Tilitapahtumat *** */
+p.yhtionTiedot {
+	margin: 10px;
+	font-size: 14px;
+}
+
+table#tilioteTable {
+	width: 540px;
+}
+
+table#tilioteTable th {
+	font-size: 12px;
+	font-weight: bold;
+	text-align: left;
+}
+
+table#tilioteTable td {
+	font-size: 12px;
+	padding: 5px 3px;
+}
+
+table#tilioteTable .oddRow {
+	background-color: #afe994;
+}
+
+table.tilinTiedot {
+	padding-left: 10px;
+	font-size: 12px;
+}
+
+table.tilinSaldot{
+	margin-top: 20px;
+	margin-bottom: 10px;
+}
+
+table.tilinSaldot td, table.tilinTiedot td{
+	font-size: 12px;
+	width: 200px;
+}
+
+/* *** end of tilitapahtumat *** */
+
+.errorMessage {
+	color: #ba0000;
+	font-size: 14px;
+	font-weight: bold;
+}
+.paddingTop {
+	padding-top: 20px;
+}
+.marginTop{
+	margin-top: 20px;
+}
+
+select{
+	border: 1px solid #c7ccb0;
+	font-size: 12px;
+	background-color: #fff;
+	color: #000;
+	padding: 4px;
+	margin-right: 10px;
+}
+.aineistohaku td{
+	width: 180px;
+}
+.bold{
+	font-weight: bold;
+}
+.link a:link, .link a:visited {
+	color: #a0b327;
+	font-size: 14px;
+}
+.link a:hover{
+	color: #c1d62f;
+}
+.paddingBottom{
+	padding-bottom: 20px;
+}
+.padding20{
+	padding: 20px;
+}
+.alignRight{
+	text-align: right;
+}
+.floatRight{
+	float: right;
+}
+.text{
+	padding-bottom: 20px;
+}
+.label{
+	width: 100px;
+	display: inline-block;
+}
+.value{
+
+}
+h1{
+	font-size: 20px;
+	font-weight: bold;
+	padding-bottom: 20px;
+}
+h2{
+	font-weight: bold;
+	padding: 20px;
+}
+p{
+	font-size: 12px;
+}
+/* Luoton tiedot -taulut */
+.luotontiedot{
+	text-align: left;
+	margin-bottom: 20px;
+}
+.luotontiedot th, .luotontiedot td{
+	width: 200px;
+}
+.luotontiedot th{
+	font-size: 14px;
+}
+.luotontiedot td{
+	font-size: 12px;
+}
+.luotontiedot .selite{
+	width: 800px;
+}
+.gray{
+	color: #aaa;
+}
