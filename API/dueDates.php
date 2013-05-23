@@ -4,6 +4,7 @@ require_once dirname(dirname(__FILE__)) . '\lib\functions.php';
 $today = date('Y-m-d');
 $yhtio = $_SESSION['yhtionNimi'];
 $ytunnus = $_SESSION['ytunnus'];
+$tilinSaldoAikavalilla = 0;
 
 print '	<h1>' . localize('Erääntyvät maksut') . '</h1>
                     <p class="yhtionTiedot"><strong>' . $yhtio . '</strong></p>';
@@ -23,28 +24,27 @@ curl_setopt($client, CURLOPT_SSL_VERIFYPEER, true);
 curl_setopt($client, CURLOPT_SSL_VERIFYHOST, 2);
 // Certificate is necessary to communicate with the code behind
 curl_setopt($client, CURLOPT_CAINFO, "C:\\xampp\\apache\\conf\\ssl.crt\\server.crt");
-$response = curl_exec($client);
+//Decode the JSON object as an array
+$response = json_decode(curl_exec($client), true);
 curl_close($client);
-$responseUTF8 = utf8_encode($response);
-$xml = simplexml_load_string($responseUTF8);
 
-foreach ($xml->dueDate as $dueDate) {
-    if (htmlspecialchars($dueDate->rowsTotal) == 0) {
-        echo "<p>" . localize('Pankkitiliä ei löydy') . "</p>";
-    } else {
-        echo "<table class='tilinTiedot'><tr><td>" . localize('Tilinro:') . "</td><td>" . htmlspecialchars($dueDate->tilinro) . "</td></tr>";
-        $printToday = date('d.m.Y', strtotime($today));
 
-        echo "<tr><td>" . localize('Erääntyvät maksut') . " </td><td>"
-        . $printToday . "</td></tr></table>";
-        foreach ($dueDate->data as $data) {
-            if (htmlspecialchars($data->rows) == 0) {
-                echo "<div class='content padding20'>
+if (htmlspecialchars($response['rowsTotal']) == 0) {
+    echo "<p>" . localize('Pankkitiliä ei löydy') . "</p>";
+} else {
+    echo "<table class='tilinTiedot'><tr><td>" . localize('Tilinro:') . "</td><td>" . htmlspecialchars($response['tilinro']) . "</td></tr>";
+    $printToday = date('d.m.Y', strtotime($today));
+
+    echo "<tr><td>" . localize('Erääntyvät maksut') . " </td><td>"
+    . $printToday . "</td></tr></table>";
+
+    if (htmlspecialchars($response['rows']) == 0) {
+        echo "<div class='content padding20'>
                             <p>" . localize('Ei erääntyviä maksuja') . "</p>
 
                             <table id='tilioteTable'>";
-            } else {
-                echo "	<div class='content'>
+    } else {
+        echo "	<div class='content'>
                             <table id='tilioteTable'>
                                     <tr>
                                             <th>Tap.pvm</th>
@@ -55,33 +55,48 @@ foreach ($xml->dueDate as $dueDate) {
                                             <th>Poista</th>
                                     </tr>
                             ";
-                $i = 1;
-                foreach ($data->row as $row) {
-                    echo "<tr";
-                    if ($i % 2 == 1)
-                        echo " class='oddRow'";
-                    $i++;
-                    echo "><td>" . htmlspecialchars($row->tapvm) . "</td>
-                                    <td>" . htmlspecialchars($row->saajanNimi) . "</td>
-                                    <td>" . htmlspecialchars($row->maksajanNimi) . "</td>
-                                    <td>" . htmlspecialchars($row->summa) . "</td>
-                                     <td>" . htmlspecialchars($row->selite) . "</td>       
-                            <td>
-                                                    <form action='' method='post'>";
-                    ?><input type='submit' name='poista' value='x' onclick="javascript: return confirm('Oletko varma, että haluat poistaa tapahtuman?');"/><?php
-                    echo "			<input type='hidden' name='tapahtuma' value='" . htmlspecialchars($row->arkistotunnus) . "'/>
-                                                    </form>
-                                            </td>
-                                    </tr>
-                                    ";
-                }
+        $i = 1;
+        $tilinro = htmlspecialchars($response['tilinro']);
+        foreach ($response as $row) {
+            $tapvm = htmlspecialchars($row['tapvm']);
+            $saajanNimi = htmlspecialchars($row['saajanNimi']);
+            $maksajanNimi = htmlspecialchars($row['maksajanNimi']);
+            $summa = htmlspecialchars($row['summa']);
+            $selite = htmlspecialchars($row['selite']);
+            $maksaja = htmlspecialchars($row['maksaja']);
+            $arkistotunnus = htmlspecialchars($row['arkistotunnus']);
+            echo "<tr";
+            if ($i % 2 == 1)
+                echo " class='oddRow'";
+            $i++;
+            echo "<td>" . date('d.m.Y', strtotime($tapvm)) . "</td>
+						<td>$saajanNimi</td>
+						<td>$maksajanNimi</td>
+					";
+            if ($maksaja == $tilinro) {
+                echo "<td>-$summa</td>";
+                $tilinSaldoAikavalilla = $tilinSaldoAikavalilla - $summa;
+            } else {
+                echo "<td>+$summa</td>";
+                $tilinSaldoAikavalilla = $tilinSaldoAikavalilla + $summa;
             }
-            echo "
-                    </table>";
 
-            echo "</div>"; //div tilitapahtumat
+            $varmistus = localize('Oletko varma että haluat poistaa maksun?');
+            echo "
+						<td>
+							<form action='' method='post'>";
+            ?><input type='submit' name='poista' value='x' onclick="javascript: return confirm('Oletko varma, että haluat poistaa tapahtuman?');"/><?php
+            echo "			<input type='hidden' name='tapahtuma' value='$arkistotunnus'/>
+							</form>
+						</td>
+					</tr>
+					";
         }
     }
+    echo "
+                    </table>";
+
+    echo "</div>"; //div tilitapahtumat
 }
 
 if (isset($_POST['poista']) && isset($_POST['tapahtuma'])) {
@@ -90,7 +105,7 @@ if (isset($_POST['poista']) && isset($_POST['tapahtuma'])) {
     $url = 'https://localhost/bank/API/dueDate.php/' . $ytunnus;
 
     //Pass the data that the user has entered
-    $data = "<dueDates><dueDate><tapahtuma>" . $_POST['tapahtuma'] . "</tapahtuma></dueDate></dueDates>";
+    $data = json_encode(array('tapahtuma' => $_POST['tapahtuma']));
 
     //Initialize curl
     $ch = curl_init();

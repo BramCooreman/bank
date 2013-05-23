@@ -3,59 +3,39 @@
 require_once dirname(dirname(__FILE__)) . '\lib\functions.php';
 
 /**
- * Prints the result of the query in an XML format this of the role
+ * Prints the result of the query in an JSON format this of the role
  * @param string $query SQL query
- * @param string $root_element_name <p>Parent tag of the XML</p>
- * @param string $wrapper_element_name <p>Child tag of the XML </p>
- * @return string XML format 
+ * @return string JSON format 
  */
-function print_result($query, $root_element_name, $wrapper_element_name) {
+function print_result($query ) {
     $result = mysql_query($query) or die('Query failed: ' . mysql_error());
     $num_rows = mysql_num_rows($result);
-    $s = "<$root_element_name>";
+    $s = array();
     if ($num_rows != 0) {
-        $s.= "<result>correct</result>";
+        $s["result"] = "correct";
         while ($line = mysql_fetch_array($result, MYSQL_ASSOC)) {
-            $s.= "<$wrapper_element_name>";
-
-            foreach ($line as $key => $col_value) {
-                $s.= "<$key>$col_value</$key>";
-            }
-
-            $s.= "</$wrapper_element_name>";
+           $s[] = $line;
         }
     } else {
-        $s.= "<$wrapper_element_name>";
-        $s.= "<result>wrong</result>";
-        $s.= "</$wrapper_element_name>";
+        $s["result"] = "wrong";
     }
 
-    $s.= "</$root_element_name>";
     mysql_free_result($result);
-    echo $s;
+    echo json_encode( $s);
 }
 
 /**
- * Prints the result of the query in an XML format this of the user
+ * Prints the result of the query in an JSON format this of the user
  * @param string $query SQL query
- * @param string $root_element_name <p>Parent tag of the XML</p>
- * @param string $wrapper_element_name <p>Child tag of the XML </p>
- * @return string XML format 
+ * @return string JSON format 
  */
-function print_results($query, $root_element_name, $wrapper_element_name) {
-    $result = mysql_query($query) or die('Query failed: ' . mysql_error());
-    $s = "<$root_element_name>";
+function print_results($query) {
+  $result = mysql_query($query) or die('Query failed: ' . mysql_error());
+   $s =array();
     while ($line = mysql_fetch_array($result, MYSQL_ASSOC)) {
-        $s.= "<$wrapper_element_name>";
-
-        foreach ($line as $key => $col_value) {
-            $s.= "<$key>$col_value</$key>";
-        }
-        $s.= "</$wrapper_element_name>";
+                    $s[] = $line ;
     }
-
-    $s.= "</$root_element_name>";
-    echo $s;
+    echo json_encode( $s);
     mysql_free_result($result);
 }
 
@@ -79,7 +59,7 @@ function selectRole($user, $role) {
 						AND yhtio.ytunnus = '$role'
 				; ";
 
-    print_result($query, 'roles', 'role');
+    print_result($query);
 }
 
 /**
@@ -97,7 +77,7 @@ function getUser($user) {
 		WHERE kuka = '$user'
 		ORDER BY yhtionNimi ASC
 		";
-    print_results($query, 'roles', 'role');
+    print_results($query);
 }
 
 $database = databaseConnect();
@@ -115,10 +95,8 @@ if ($path != null) {
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $input = file_get_contents("php://input");
 
-    $xml = simplexml_load_string($input);
-    foreach ($xml->role as $role) {
-        selectRole($_GET['user'], $role->asiakasrooli);
-    }
+    $role = json_decode($input,true);
+        selectRole($_GET['user'], $role['asiakasrooli']);
 } else if ($_SERVER['REQUEST_METHOD'] == 'GET') {
     defineLang($_GET['lang']);
     if (isset($_GET['user'])) {

@@ -3,23 +3,20 @@
 require_once '../lib/functions.php';
 
 /**
- * Prints the result of the query in an XML format
+ * Prints the result of the query in a JSON format
  * @param string $query SQL query
- * @param string $root_element_name <p>Parent tag of the XML</p>
- * @param string $wrapper_element_name <p>Child tag of the XML </p>
  * @param string $password Pass the password that the user has typed
- * @return string XML format 
+ * @return string JSON format 
  */
-function print_result($query, $root_element_name, $wrapper_element_name, $password) {
+function print_result($query, $password) {
     $result = mysql_query($query) or die('Query failed: ' . mysql_error());
 
     // Tarkastetaan löytyykö tietoja tietokannasta
     $num_rows = mysql_num_rows($result);
-    $s = "<$root_element_name>";
-    $s.= "<$wrapper_element_name>";
+    $s = array();
     // Ei tietoa, ei oikea käyttäjänimi
     if ($num_rows == 0) {
-        $s .= "<authenticated>0</authenticated>";
+        $s["authenticated"] = 0;
     }
     // Tietoa löytyy, oikea käyttäjänimi
     else {
@@ -27,20 +24,17 @@ function print_result($query, $root_element_name, $wrapper_element_name, $passwo
         $passwordFromDB = utf8_encode($row['salasana']);
 
         if ($passwordFromDB == md5($password)) {
-            $s .= "<authenticated>1</authenticated>";
-            $s .= "<ytunnus>" . $row['ytunnus'] . "</ytunnus>";
-            $s .= "<yhtionNimi>" . $row['yhtionNimi'] . "</yhtionNimi>";
-            $s .= "<kayttaja>" . $row['kuka'] . "</kayttaja>";
-            $s .= "<tilinro>" . $row['tilinro'] . "</tilinro>";
-            $s .= "<profiili>" . $row['profiili'] . "</profiili>";
+            $s["authenticated"] = 1;
+            $s["ytunnus"] = $row['ytunnus'];
+            $s["yhtionNimi"] = $row['yhtionNimi'];
+            $s["kayttaja"] = $row['kuka'];
+            $s["tilinro"] = $row['tilinro'];
+            $s["profiili"] = $row['profiili'];
         } else {
-            $s .= "<authenticated>0</authenticated>";
+            $s["authenticated"] = 0;
         }
     }
-
-    $s.= "</$wrapper_element_name>";
-    $s.= "</$root_element_name>";
-    echo $s;
+    echo json_encode($s);
     mysql_free_result($result);
 }
 
@@ -64,9 +58,7 @@ function identify_user($username, $password) {
                         WHERE		kuka.kuka = '$username' 
                         ; ";
 
-    $root_element_name = 'users';
-    $wrapper_element_name = 'user';
-    print_result($query, $root_element_name, $wrapper_element_name, $password);
+    print_result($query, $password);
 }
 
 $database = databaseConnect();
@@ -83,10 +75,9 @@ if ($path != null) {
 //Did the user pressed Login?
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $input = file_get_contents("php://input");
-    $xml = simplexml_load_string($input);
 
-    foreach ($xml->user as $user) {
-        identify_user($user->username, $user->password);
-    }
+    //Decode the data that was passed through POST
+    $user = json_decode($input, true);
+    identify_user($user['username'], $user['password']);
 }
 ?>

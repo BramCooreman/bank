@@ -3,55 +3,42 @@
 require_once dirname(dirname(__FILE__)) . '\lib\functions.php';
 
 /**
- * Prints the result of the query in an XML format
+ * Prints the result of the query in an JSON format
  * @param string $query SQL query
- * @param string $root_element_name <p>Parent tag of the XML</p>
- * @param string $wrapper_element_name <p>Child tag of the XML </p>
- * @return string XML format 
+ * @return string JSON format 
  */
-function print_result($query, $root_element_name, $wrapper_element_name) {
+function print_result($query, $tilinro) {
     $result = mysql_query($query) or die('Query failed: ' . mysql_error());
-    $s = "<$root_element_name>";
+    $s = array();
+    $s['tilinro'] = $tilinro;
     while ($line = mysql_fetch_array($result, MYSQL_ASSOC)) {
-        $s.= "<$wrapper_element_name>";
-        foreach ($line as $key => $col_value) {
-            $s.= "<$key>$col_value</$key>";
-        }
-        $s.= "</$wrapper_element_name>";
+        $s[] = $line;
     }
-    $s.= "</$root_element_name>";
-    echo $s;
+    echo json_encode($s);
     mysql_free_result($result);
 }
 
 /**
- * Prints the result of the query in an XML format
+ * Prints the result of the query in an JSON format
  * @param string $query SQL query
- * @param string $root_element_name <p>Parent tag of the XML</p>
- * @param string $wrapper_element_name <p>Child tag of the XML </p>
  * @param string $tempSaldo Temp Saldo that is needed to calculate
  * @param string $tilinro
  * @param string $tempSaldoEnd Temp end saldo
  * @param string $tilinSaldo
- * @return string XML format 
+ * @return string JSON format 
  */
-function print_results($query, $root_element_name, $wrapper_element_name, $tempSaldo, $tilinro, $tempSaldoEnd, $tilinSaldo) {
+function print_results($query, $tempSaldo, $tilinro, $tempSaldoEnd, $tilinSaldo) {
     $result = mysql_query($query) or die('Query failed: ' . mysql_error());
-    $s = "<$root_element_name>";
-    $s .= "<tempSaldo>$tempSaldo</tempSaldo>";
-    $s .= "<tempSaldoEnd>$tempSaldoEnd</tempSaldoEnd>";
-    $s .= "<tilinSaldo>$tilinSaldo</tilinSaldo>";
-    $s .= "<tilinro>$tilinro</tilinro>";
+    $s = array();
+    $s["tempSaldo"] = $tempSaldo;
+    $s["tempSaldoEnd"] = $tempSaldoEnd;
+    $s["tilinSaldo"] = $tilinSaldo;
+    $s["tilinro"] = $tilinro;
 
     while ($line = mysql_fetch_array($result, MYSQL_ASSOC)) {
-        $s.= "<$wrapper_element_name>";
-        foreach ($line as $key => $col_value) {
-            $s.= "<$key>$col_value</$key>";
-        }
-        $s.= "</$wrapper_element_name>";
+        $s[] = $line;
     }
-    $s.= "</$root_element_name>";
-    echo $s;
+    echo json_encode($s);
     mysql_free_result($result);
 }
 
@@ -74,7 +61,6 @@ function get_transactions($ytunnus) {
     else {
         $row = mysql_fetch_array($result);
         $tilinro = $row['tilinro'];
-        //echo $tilinro;
     }
     $query2 = "	SELECT	tapvm
 					, saajanNimi
@@ -96,9 +82,7 @@ function get_transactions($ytunnus) {
 					ORDER BY tapvm DESC
 					LIMIT 5
 					";
-    $root_element_name = 'transactions';
-    $wrapper_element_name = 'transaction';
-    print_result($query2, $root_element_name, $wrapper_element_name);
+    print_result($query2, $tilinro);
 }
 
 /**
@@ -160,9 +144,7 @@ function get_transaction($from, $to, $ytunnus) {
     }
 
     $tilinSaldo = getSaldo($tilinro, date('Y-m-d'));
-    $root_element_name = 'overdracht';
-    $wrapper_element_name = 'transaction';
-    print_results($query2, $root_element_name, $wrapper_element_name, $tempSaldo, $tilinro, $tempSaldoEnd, $tilinSaldo);
+    print_results($query2, $tempSaldo, $tilinro, $tempSaldoEnd, $tilinSaldo);
 }
 
 $database = databaseConnect();
@@ -180,25 +162,25 @@ if ($path != null) {
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($path_params[1])) {
         $input = file_get_contents("php://input");
-        $xml = simplexml_load_string($input);
-        foreach ($xml->transaction as $transaction) {
-            $startDate = $transaction->from;
-            $endDate = $transaction->to;
-            $startDate = checkDateFormat($startDate);
-            $endDate = checkDateFormat($endDate);
+        //Get the values and pass it as an array
+        $transaction = json_decode($input, true);
 
-            if ($startDate != "" && $endDate != "") {
-                $re1 = '((?:(?:[0-2]?\\d{1})|(?:[3][01]{1})))(?![\\d])'; # Day 1
-                $re2 = '(.)'; # Any Single Character 1
-                $re3 = '((?:(?:[0-2]?\\d{1})|(?:[3][01]{1})))(?![\\d])'; # Day 2
-                $re4 = '(\\.)'; # Any Single Character 2
-                $re5 = '((?:(?:[1]{1}\\d{1}\\d{1}\\d{1})|(?:[2]{1}\\d{3})))(?![\\d])'; # Year 1
-                $fromBool = preg_match_all("/" . $re1 . $re2 . $re3 . $re4 . $re5 . "/is", $startDate, $matches);
-                $toBool = preg_match_all("/" . $re1 . $re2 . $re3 . $re4 . $re5 . "/is", $endDate, $matches);
+        $startDate = $transaction['from'];
+        $endDate = $transaction['to'];
+        $startDate = checkDateFormat($startDate);
+        $endDate = checkDateFormat($endDate);
 
-                if ($fromBool && $toBool) {
-                    get_transaction($startDate, $endDate, $path_params[1]);
-                }
+        if ($startDate != "" && $endDate != "") {
+            $re1 = '((?:(?:[0-2]?\\d{1})|(?:[3][01]{1})))(?![\\d])'; # Day 1
+            $re2 = '(.)'; # Any Single Character 1
+            $re3 = '((?:(?:[0-2]?\\d{1})|(?:[3][01]{1})))(?![\\d])'; # Day 2
+            $re4 = '(\\.)'; # Any Single Character 2
+            $re5 = '((?:(?:[1]{1}\\d{1}\\d{1}\\d{1})|(?:[2]{1}\\d{3})))(?![\\d])'; # Year 1
+            $fromBool = preg_match_all("/" . $re1 . $re2 . $re3 . $re4 . $re5 . "/is", $startDate, $matches);
+            $toBool = preg_match_all("/" . $re1 . $re2 . $re3 . $re4 . $re5 . "/is", $endDate, $matches);
+
+            if ($fromBool && $toBool) {
+                get_transaction($startDate, $endDate, $path_params[1]);
             }
         }
     }

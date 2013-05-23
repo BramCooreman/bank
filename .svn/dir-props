@@ -1,7 +1,9 @@
 K 10
 svn:ignore
-V 44
+V 70
 .tarkistaLyhennys.php.swo
 .luotonTiedot.php
+.gitattributes
+.gitignore
 
 END

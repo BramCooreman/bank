@@ -11,7 +11,7 @@ if (isset($_POST['roles'])) {
     $url = 'https://localhost/bank/API/role.php?user=' . $_SESSION['kayttaja'];
 
     //Pass the data that the user has entered
-    $data = "<roles><role><asiakasrooli>" . $_POST['asiakasrooli'] . "</asiakasrooli></role></roles>";
+    $data = json_encode(array("asiakasrooli" => $_POST['asiakasrooli']));
     $ch = curl_init();
 
     curl_setopt($ch, CURLOPT_URL, $url);
@@ -27,17 +27,16 @@ if (isset($_POST['roles'])) {
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
     // Certificate is necessary to communicate with the code behind
     curl_setopt($ch, CURLOPT_CAINFO, "C:\\xampp\\apache\\conf\\ssl.crt\\server.crt");
-    $response = curl_exec($ch);
+    //Get the values that are send as an array
+    $response = json_decode(curl_exec($ch), true);
 
     curl_close($ch);
 
-    $responseUTF8 = utf8_encode($response);
-    $xml = simplexml_load_string($responseUTF8);
-    if (htmlspecialchars($xml->result) == "correct") {
-        foreach ($xml->role as $result) {
-            $_SESSION['ytunnus'] = htmlspecialchars($result->ytunnus);
-            $_SESSION['yhtionNimi'] = htmlspecialchars($result->yhtionNimi);
-            $_SESSION['tilinro'] = htmlspecialchars($result->tilinro);
+    if (htmlspecialchars($response['result']) == "correct") {
+        foreach ($response as $role) {
+            $_SESSION['ytunnus'] = htmlspecialchars($role['ytunnus']);
+            $_SESSION['yhtionNimi'] = htmlspecialchars($role['yhtionNimi']);
+            $_SESSION['tilinro'] = htmlspecialchars($role['tilinro']);
             header("Location: index.php?sivu=roles");
             echo "<p>Asiakasrooli vaihdettu!</p>";
         }
@@ -63,22 +62,20 @@ curl_setopt($client, CURLOPT_SSL_VERIFYPEER, true);
 curl_setopt($client, CURLOPT_SSL_VERIFYHOST, 2);
 // Certificate is necessary to communicate with the code behind
 curl_setopt($client, CURLOPT_CAINFO, "C:\\xampp\\apache\\conf\\ssl.crt\\server.crt");
+//Get the values that are send as an array
+$response = json_decode(curl_exec($client), true);
 
-$response = curl_exec($client);
 curl_close($client);
-$response = str_replace('&', '&amp;', $response);
-$responseUTF8 = utf8_encode($response);
-$xml = simplexml_load_string($responseUTF8);
 
 echo "<form action='' method='post'><select name='asiakasrooli'>";
 
 // Tulostus listaan
-foreach ($xml->role as $role) {
-    echo "<option value=" . htmlspecialchars($role->ytunnus);
-    if (htmlspecialchars($role->ytunnus) == $_SESSION['ytunnus']) {
+foreach ($response as $role) {
+    echo "<option value=" . htmlspecialchars($role['ytunnus']);
+    if (htmlspecialchars($role['ytunnus']) == $_SESSION['ytunnus']) {
         echo " selected='selected'";
     }
-    echo ">" . htmlspecialchars($role->yhtionNimi) . "</option>\n";
+    echo ">" . htmlspecialchars($role['yhtionNimi']) . "</option>\n";
 }
 
 echo "</select><input class='painike' type='submit' name='roles' value=" . localize('VAIHDA') . " /></form>";

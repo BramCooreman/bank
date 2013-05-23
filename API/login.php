@@ -14,8 +14,7 @@ if (isset($_POST['login'])) {
         $url = 'https://localhost/bank/API/user.php';
 
         //Pass the data that the user has entered
-        $data = "<users><user><username>" . $userName . "</username><password>" . $password .
-                "</password></user></users>";
+        $data = json_encode(array("username" => $userName, "password" => $password));
 
         //Initialize curl
         $ch = curl_init();
@@ -32,22 +31,20 @@ if (isset($_POST['login'])) {
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
         // Certificate is necessary to communicate with the code behind
         curl_setopt($ch, CURLOPT_CAINFO, "C:\\xampp\\apache\\conf\\ssl.crt\\server.crt");
-        $response = curl_exec($ch);
+        //Get the values that are send back to the user as an array
+        $response = json_decode(curl_exec($ch), true);
 
         curl_close($ch);
 
-        $xml = simplexml_load_string($response);
 
-        foreach ($xml->user as $user) {
-            $_SESSION['Authenticated'] = htmlspecialchars($user->authenticated);
-            $_SESSION['ytunnus'] = htmlspecialchars($user->ytunnus);
-            $_SESSION['yhtionNimi'] = htmlspecialchars($user->yhtionNimi);
-            $_SESSION['kayttaja'] = htmlspecialchars($user->kayttaja);
-            $_SESSION['tilinro'] = htmlspecialchars($user->tilinro);
+        $_SESSION['Authenticated'] = htmlspecialchars($response['authenticated']);
+        $_SESSION['ytunnus'] = htmlspecialchars($response['ytunnus']);
+        $_SESSION['yhtionNimi'] = htmlspecialchars($response['yhtionNimi']);
+        $_SESSION['kayttaja'] = htmlspecialchars($response['kayttaja']);
+        $_SESSION['tilinro'] = htmlspecialchars($response['tilinro']);
 
-            if (htmlspecialchars($user->profiili) == 'Admin profil') {
-                $_SESSION['rooli'] = 1;
-            }
+        if (htmlspecialchars($response['profiili']) == 'Admin profil') {
+            $_SESSION['rooli'] = 1;
         }
     }
     session_write_close();

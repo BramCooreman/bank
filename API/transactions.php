@@ -47,8 +47,7 @@ if (isset($_POST['search'])) {
         $url = 'https://localhost/bank/API/transaction.php/' . $_SESSION['ytunnus'];
 
         //Pass the data that the user has entered
-        $data = "<transactions><transaction><from>" . $_POST['startdate'] . "</from><to>" . $_POST['enddate'] .
-                "</to></transaction></transactions>";
+        $data = json_encode(array("from" => $_POST['startdate'], 'to' => $_POST['enddate']));
 
         //Initialize curl
         $ch = curl_init();
@@ -65,14 +64,12 @@ if (isset($_POST['search'])) {
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
         // Certificate is necessary to communicate with the code behind
         curl_setopt($ch, CURLOPT_CAINFO, "C:\\xampp\\apache\\conf\\ssl.crt\\server.crt");
-        $response = curl_exec($ch);
+        //Parse the values that are received of the API
+        $response = json_decode(curl_exec($ch), true);
 
         curl_close($ch);
 
-        $responseUTF8 = utf8_encode($response);
-        $xml = simplexml_load_string($responseUTF8);
-
-        $tilinro = $xml->tilinro;
+        $tilinro = $response["tilinro"];
         echo "<table class='tilinTiedot'><tr><td>" . localize('Tilinro:') . "</td><td> $tilinro</td></tr>";
 
         echo "<tr><td>" . localize('Tilitapahtumat aikavälillä') . " </td><td>" . $_POST['startdate'] . " - " . $_POST['enddate'] . "</td></tr></table>";
@@ -91,26 +88,30 @@ if (isset($_POST['search'])) {
                             <td></td>
                             <td></td>
                             <td>" . localize('Alkusaldo') . " " . $_POST['startdate'] . "</td>
-                            <td class='alignRight'>$xml->tempSaldo</td><td></td></tr>";
+                            <td class='alignRight'>" . $response["tempSaldo"] . "</td><td></td></tr>";
 
         $i = 1;
-
-        foreach ($xml->transaction as $book) {
+        $k = 0;
+        foreach ($response as $transaction) {
+            if ($k < 4) {
+                $k++;
+                continue;
+            }
             echo "<tr";
             if ($i % 2 == 1)
                 echo " class='oddRow'";
             $i++;
-            echo "><td>" . date('d.m.Y', strtotime(htmlspecialchars($book->tapvm))) . "</td>
-                                    <td>" . iconv('UTF-8', 'ISO-8859-1', $book->saajanNimi) . "</td>
-                                    <td>" . iconv('UTF-8', 'ISO-8859-1', $book->maksajanNimi) . "</td>";
-            if (htmlspecialchars($book->maksaja) == $tilinro) {
-                echo "<td class='alignRight'>-" . htmlspecialchars($book->summa) . "</td>";
-                $tilinSaldoAikavalilla = $tilinSaldoAikavalilla - htmlspecialchars($book->summa);
+            echo "><td>" . date('d.m.Y', strtotime(htmlspecialchars($transaction["tapvm"]))) . "</td>
+                                    <td>" . iconv('UTF-8', 'ISO-8859-1', $transaction["saajanNimi"]) . "</td>
+                                    <td>" . iconv('UTF-8', 'ISO-8859-1', $transaction["maksajanNimi"]) . "</td>";
+            if (htmlspecialchars($transaction["maksaja"]) == $tilinro) {
+                echo "<td class='alignRight'>-" . htmlspecialchars($transaction["summa"]) . "</td>";
+                $tilinSaldoAikavalilla = $tilinSaldoAikavalilla - htmlspecialchars($transaction["summa"]);
             } else {
-                echo "<td class='alignRight'>+" . htmlspecialchars($book->summa) . "</td>";
-                $tilinSaldoAikavalilla = $tilinSaldoAikavalilla + htmlspecialchars($book->summa);
+                echo "<td class='alignRight'>+" . htmlspecialchars($transaction["summa"]) . "</td>";
+                $tilinSaldoAikavalilla = $tilinSaldoAikavalilla + htmlspecialchars($transaction["summa"]);
             }echo "
-                                <td>" . iconv('UTF-8', 'ISO-8859-1', $book->viite) . " " . iconv('UTF-8', 'ISO-8859-1', $book->selite) . "</td>
+                                <td>" . iconv('UTF-8', 'ISO-8859-1', $transaction["viite"]) . " " . iconv('UTF-8', 'ISO-8859-1', $transaction["selite"]) . "</td>
                         </tr>
                         ";
         }
@@ -125,17 +126,17 @@ if (isset($_POST['search'])) {
                 <td></td>
                 <td></td>
                 <td>" . localize('Tilin saldo') . " " . $endDate . "</td>
-                <td class='alignRight'>$xml->tempSaldoEnd</td>
+                <td class='alignRight'>" . $response["tempSaldoEnd"] . "</td>
                 <td></td>
             </tr>
         </table>
         <table class='tilinSaldot'>
 
         <tr><td>" . localize('Tilin saldo') . " " . date('d.m.Y') . ": </td><td>";
-        if ($xml->tilinSaldo >= 0) {
+        if ($response["tilinSaldo"] >= 0) {
             echo "+";
         }
-        echo "$xml->tilinSaldo " . localize('euroa') . "</td></tr></table>";
+        echo $response["tilinSaldo"] . localize('euroa') . "</td></tr></table>";
         echo "</div><!-- /tilitapahtumat -->
                     <p><a class='painike' href='index.php?sivu=transactions'>" . localize('Takaisin') . "</a></p>";
     } else {
@@ -208,11 +209,9 @@ function printTimeFrameSearchForm($startDate = false, $endDate = false) {
     curl_setopt($client, CURLOPT_SSL_VERIFYHOST, 2);
     // Certificate is necessary to communicate with the code behind
     curl_setopt($client, CURLOPT_CAINFO, "C:\\xampp\\apache\\conf\\ssl.crt\\server.crt");
-    $response = curl_exec($client);
+    $response = json_decode(curl_exec($client), true);
     curl_close($client);
 
-    $responseUTF8 = utf8_encode($response);
-    $xml = simplexml_load_string($responseUTF8);
     echo '<div id="tilitapahtumat" class="viimeisetTilit">
             <h2>' . localize("Viimeisimmät tilitapahtumat") . '</h2>
                 <table id="tilioteTable" class="tiliTiedot">
@@ -225,17 +224,19 @@ function printTimeFrameSearchForm($startDate = false, $endDate = false) {
                         </tr>';
 
     $i = 1;
-    foreach ($xml->transaction as $book) {
-        $tapvm = htmlspecialchars($book->tapvm);
-        $saajanNimi = htmlspecialchars($book->saajanNimi);
-        $maksajanNimi = htmlspecialchars($book->maksajanNimi);
-        $summa = htmlspecialchars($book->summa);
-        $selite = htmlspecialchars($book->selite);
-        $viite = htmlspecialchars($book->viite);
+    foreach ($response as $transaction) {
+        if ($transaction < 1)
+            continue;
+        $tapvm = htmlspecialchars($transaction['tapvm']);
+        $saajanNimi = htmlspecialchars($transaction['saajanNimi']);
+        $maksajanNimi = htmlspecialchars($transaction['maksajanNimi']);
+        $summa = htmlspecialchars($transaction['summa']);
+        $selite = htmlspecialchars($transaction['selite']);
+        $viite = htmlspecialchars($transaction['viite']);
         if (!empty($viite)) {
             $viite = $viite . ",<br/>";
         }
-        $maksaja = htmlspecialchars($book->maksaja);
+        $maksaja = htmlspecialchars($transaction['maksaja']);
 
         echo "<tr";
         if ($i % 2 == 1)
@@ -248,7 +249,7 @@ function printTimeFrameSearchForm($startDate = false, $endDate = false) {
                                         ";
 
         // jos laskun maksaja on sama kuin yrityksen oma tili, on kyse maksusta (eli tulostetaan miinusmerkki)
-        if (htmlspecialchars($book->maksaja) == $xml->tilinro) {
+        if (htmlspecialchars($transaction['maksaja']) == htmlspecialchars($response['tilinro'])) {
             echo "<td class='alignRight'>-$summa</td>";
             $tilinSaldoAikavalilla = $tilinSaldoAikavalilla - $summa;
         } else {

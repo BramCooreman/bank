@@ -3,13 +3,11 @@
 require_once dirname(dirname(__FILE__)) . '\lib\functions.php';
 
 /**
- * Prints the result of the query in an XML format
+ * Prints the result of the query in an JSON format
  * @param string $query SQL query
- * @param string $root_element_name <p>Parent tag of the XML</p>
- * @param string $wrapper_element_name <p>Child tag of the XML </p>
- * @return string XML format 
+ * @return string JSON format 
  */
-function print_result($query, $root_element_name, $wrapper_element_name) {
+function print_result($query) {
     try {
         mysql_query("START TRANSACTION");
         $result = mysql_query($query);
@@ -17,21 +15,13 @@ function print_result($query, $root_element_name, $wrapper_element_name) {
     } catch (Exception $error) {
         mysql_query("ROLLBACK");
     }
-    $s = "";
+    $s = array();
     if ($result === true) {
-        $s = "<$root_element_name>";
-        $s.= "<$wrapper_element_name>";
-        $s.= "<result>correct</result>";
-        $s.= "</$wrapper_element_name>";
-        $s.= "</$root_element_name>";
+        $s['result'] = "correct";
     } else {
-        $s = "<$root_element_name>";
-        $s.= "<$wrapper_element_name>";
-        $s.= "<result>wrong</result>";
-        $s.= "</$wrapper_element_name>";
-        $s.= "</$root_element_name>";
+        $s['result'] = "wrong";
     }
-    echo $s;
+    echo json_encode($s);
 }
 
 /**
@@ -66,7 +56,7 @@ function insertInDB($saaja, $saajanNimi, $maksaja, $maksajanNimi, $summa, $tapvm
 		luontiaika=now()
 	";
 
-    print_result($query, "payments", "payment");
+    print_result($query);
 }
 
 //initialize the database
@@ -74,88 +64,86 @@ $database = databaseConnect();
 
 // Set the content type to text/xml
 header("Content-Type: text/xml");
-
 //Check if the user has send a post to the code behind
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     //Get the input of the XML data that has been send to the code behind
     $input = file_get_contents("php://input");
-    $xml = simplexml_load_string($input);
+    $payment = json_decode($input, true);
 
     //Get the parameters that are send through URL
     $ytunnus = $_GET['ytunnus'];
     //Is necessary because REST is Stateless so the Language isn't send with the request 
     defineLang($_GET['lang']);
-    foreach ($xml->payment as $payment) {
-        $maksupvm = $payment->maksupvm;              /*         * < Maksun p‰iv‰m‰‰r‰ */
-        $saajanNimi = $payment->saajanNimi;   /*         * < Maksun saajan nimi */
-        $saaja = $payment->saajanTili;   /*         * < Maksun saajan tilinumero */
-        $viite = $payment->viite;    /*         * < Maksun viitenumero */
-        $viesti = $payment->viesti;                         /*         * < Maksun viesti */
-        $summa = $payment->summa;                           /*         * < Maksun summa */
-        $arkistotunnus = getArchiveReferenceNumber();
 
-        $tiliquery = "SELECT tilinro, omistaja FROM TAMK_pankkitili WHERE ytunnus = '$ytunnus'";
-        $tiliresult = mysql_query($tiliquery);
+    $maksupvm = $payment["maksupvm"];                   /*     * < Maksun p‰iv‰m‰‰r‰ */
+    $saajanNimi = $payment["saajanNimi"];               /*     * < Maksun saajan nimi */
+    $saaja = $payment["saajanTili"];                    /*     * < Maksun saajan tilinumero */
+    $viite = $payment["viite"];                        /*     * < Maksun viitenumero */
+    $viesti = $payment["viesti"];                       /*     * < Maksun viesti */
+    $summa = $payment["summa"];                       /*     * < Maksun summa */
+    $arkistotunnus = getArchiveReferenceNumber();
 
-        $maksaja = mysql_result($tiliresult, 0, 'tilinro');
-        $maksajanNimi = mysql_result($tiliresult, 0, 'omistaja');
+    $tiliquery = "SELECT tilinro, omistaja FROM TAMK_pankkitili WHERE ytunnus = '$ytunnus'";
+    $tiliresult = mysql_query($tiliquery);
 
-        $pankkitili = $saaja;
-        require_once '../../pupesoft/inc/pankkitilinoikeellisuus.php';
-        if (empty($pankkitili)) {
-            $errorText = localize('Tilinumero on virheellinen, tyhj‰.');
-        } else {
-            $saaja = $pankkitili;
-        }
+    $maksaja = mysql_result($tiliresult, 0, 'tilinro');
+    $maksajanNimi = mysql_result($tiliresult, 0, 'omistaja');
 
-        // Maksaja ja saaja eiv‰t voi olla sama yhtiˆ
-        // The payer and payee can not be the same company
-        if ($saaja == $maksaja) {
-            $errorText = localize('Et voi maksaa omalle tilillesi.');
-        }
+    $pankkitili = $saaja;
+    require_once '../../pupesoft/inc/pankkitilinoikeellisuus.php';
+    if (empty($pankkitili)) {
+        $errorText = localize('Tilinumero on virheellinen, tyhj‰.');
+    } else {
+        $saaja = $pankkitili;
+    }
 
-        // Tarkistetaan, ett‰ saajan tilinumero alkaa 9:ll‰
-        if (substr($saaja, 0, 2) == 'FI') {
+    // Maksaja ja saaja eiv‰t voi olla sama yhtiˆ
+    // The payer and payee can not be the same company
+    if ($saaja == $maksaja) {
+        $errorText = localize('Et voi maksaa omalle tilillesi.');
+    }
 
-            $query = "SELECT	omistaja
+    // Tarkistetaan, ett‰ saajan tilinumero alkaa 9:ll‰
+    if (substr($saaja, 0, 2) == 'FI') {
+
+        $query = "SELECT	omistaja
                                         FROM	TAMK_pankkitili 
                                         WHERE	yhtio = 'pankk'
                                         AND		tilinro = '$saaja' 
                                         ";
 
-            $result = mysql_query($query);
+        $result = mysql_query($query);
 
-            // Jos tietoja ei lˆydy, tilinumero on virheellinen
-            if (mysql_num_rows($result) == 0) {
-                $errorText = localize('Tilinumero on virheellinen.');
-            } else {
-                if (empty($saajanNimi)) {
-                    $row = mysql_fetch_array($result);
-                    $saajanNimi = $row['omistaja'];
-                }
+        // Jos tietoja ei lˆydy, tilinumero on virheellinen
+        if (mysql_num_rows($result) == 0) {
+            $errorText = localize('Tilinumero on virheellinen.');
+        } else {
+            if (empty($saajanNimi)) {
+                $row = mysql_fetch_array($result);
+                $saajanNimi = $row['omistaja'];
             }
         }
-
-        $summa = str_replace(',', '.', $summa);
-
-        if ($summa <= 0) {
-            $errorText = localize('Syˆt‰ maksun summa.');
-        }
-        // Jos maksun suoritus tapahtuu t‰n‰‰n, tarkastetaan onko rahaa tarpeeksi laskun suorittamiseen
-        if ($maksupvm == date('Y-m-d')) {
-            if ($summa > getSaldo($maksaja, $maksupvm)) {
-                // Ei tarpeeksi rahaa
-                $errorText = localize('Tilin saldo ei riit√§ maksuun.');
-            } else {
-                // Tarpeeksi rahaa, ei toimintoja
-            }
-        }
-
-        $tapvm = $maksupvm;
-        $laatija = $_GET['laatija'];
-
-        //insert the correct data in the database
-        insertInDB($saaja, $saajanNimi, $maksaja, $maksajanNimi, $summa, $tapvm, $viite, $viesti, $arkistotunnus, $laatija);
     }
+
+    $summa = str_replace(',', '.', $summa);
+
+    if ($summa <= 0) {
+        $errorText = localize('Syˆt‰ maksun summa.');
+    }
+    // Jos maksun suoritus tapahtuu t‰n‰‰n, tarkastetaan onko rahaa tarpeeksi laskun suorittamiseen
+    if ($maksupvm == date('Y-m-d')) {
+        if ($summa > getSaldo($maksaja, $maksupvm)) {
+            // Ei tarpeeksi rahaa
+            $errorText = localize('Tilin saldo ei riit√§ maksuun.');
+        } else {
+            // Tarpeeksi rahaa, ei toimintoja
+        }
+    }
+
+    $tapvm = $maksupvm;
+    $laatija = $_GET['laatija'];
+
+    //insert the correct data in the database
+    insertInDB($saaja, $saajanNimi, $maksaja, $maksajanNimi, $summa, $tapvm, $viite, $viesti, $arkistotunnus, $laatija);
 }
 ?>

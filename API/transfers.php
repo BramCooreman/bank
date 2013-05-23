@@ -16,10 +16,9 @@ if (isset($_POST['transfers'])) {
     $url = 'https://localhost/bank/API/transfer.php?laatija=' . $_SESSION['kayttaja'];
 
     //Pass the data that the user has entered
-    $data = "<transfers><transfer><maksupvm>" . $_POST['maksunErapaiva'] . "</maksupvm><saajanNimi>" . $_POST['saajanNimi'] .
-            "</saajanNimi><saajanTili>" . $_POST['saajanTili'] . "</saajanTili><viite>" . $_POST['viesti'] .
-            "</viite><summa>" . $_POST['summa'] .
-            "</summa></transfer></transfers>";
+    $data = json_encode(array("maksupvm" => $_POST['maksunErapaiva'], "saajanNimi" => $_POST['saajanNimi'],
+        "saajanTili" => $_POST['saajanTili'], "viite" => $_POST['viesti'],
+        "summa" => $_POST['summa']));
 
     //Initialize curl
     $ch = curl_init();
@@ -36,22 +35,17 @@ if (isset($_POST['transfers'])) {
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
     // Certificate is necessary to communicate with the code behind
     curl_setopt($ch, CURLOPT_CAINFO, "C:\\xampp\\apache\\conf\\ssl.crt\\server.crt");
-    $response = curl_exec($ch);
-
+    //Decode the JSON object as an array
+    $response = json_decode(curl_exec($ch), true);
     curl_close($ch);
 
-    $responseUTF8 = utf8_encode($response);
-    $xml = simplexml_load_string($responseUTF8);
-
-    foreach ($xml->transfer as $transfer) {
-        if (htmlspecialchars($transfer->result) === "correct") {
-            print "
+    if (htmlspecialchars($response['result']) === "correct") {
+        print "
                     <p class='paddingBottom'>" . localize('Maksu suoritettu.') . "</p>
                     <p class='link'><a href='index.php?sivu=payments'>" . localize('Tee uusi maksu') . "</a></p>
             ";
-        } else {
-            header("Location: index.php?sivu=errorPage");
-        }
+    } else {
+        header("Location: index.php?sivu=errorPage");
     }
 } else {
     //Did the user pressed jatka?

@@ -18,11 +18,11 @@ if (isset($_POST['payments'])) {
     $url = 'https://localhost/bank/API/payment.php?ytunnus=' . $_SESSION['ytunnus'] . '&laatija=' . $_SESSION['kayttaja'] . "&lang=" . $_SESSION['lang'];
 
     //Pass the data that the user has entered
-    $data = "<payments><payment><maksupvm>" . $_POST['maksupvm'] . "</maksupvm><saajanNimi>" . $_POST['saajanNimi'] .
-            "</saajanNimi><saajanTili>" . $_POST['saajanTili'] . "</saajanTili><viite>" . $_POST['viite'] .
-            "</viite><viesti>" . $_POST['viesti'] .
-            "</viesti><summa>" . $_POST['summa'] .
-            "</summa></payment></payments>";
+    $data = json_encode(array("maksupvm" => $_POST['maksupvm'], "saajanNimi" => $_POST['saajanNimi'],
+        "saajanTili" => $_POST['saajanTili'], "viite" => $_POST['viite'],
+        "viesti" => $_POST['viesti'],
+        "summa" => $_POST['summa']));
+
 
     //Initialize curl
     $ch = curl_init();
@@ -39,20 +39,17 @@ if (isset($_POST['payments'])) {
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
     // Certificate is necessary to communicate with the code behind
     curl_setopt($ch, CURLOPT_CAINFO, "C:\\xampp\\apache\\conf\\ssl.crt\\server.crt");
-    $response = curl_exec($ch);
+    // Get the values that are send back to the user as an array
+    $response = json_decode(curl_exec($ch), true);
     curl_close($ch);
 
-    //Parse the data that has been send by the code behind as XML
-    $xml = simplexml_load_string($response);
-    foreach ($xml->payment as $payment) {
-        if (htmlspecialchars($payment->result) === "correct") {
-            print "
+    if (htmlspecialchars($response['result']) === "correct") {
+        print "
                         <p class='paddingBottom'>" . localize('Maksu suoritettu.') . "</p>
                         <p class='link'><a href='index.php?sivu=payments'>" . localize('Tee uusi maksu') . "</a></p>
                     ";
-        } else {
-            header("Location: index.php?sivu=errorPage");
-        }
+    } else {
+        header("Location: index.php?sivu=errorPage");
     }
 } else {
     if ((isset($_POST['jatka']) || isset($_POST['muuta'])) && !isset($_POST['tyhjenna'])) {

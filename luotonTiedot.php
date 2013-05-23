@@ -15,7 +15,7 @@
  * @todo
  *   Lainojen lyhentämiset menevät lainamäärän ylitse!
  */ 
-require_once 'functions.php';
+require_once dirname(dirname(__FILE__)) . '\bank\lib\functions.php';
 echo "<h1>".localize('Luoton tiedot')."</h1>";
 
 	$tilinro = $_SESSION[ 'tilinro' ];
@@ -190,6 +190,7 @@ echo "<h1>".localize('Luoton tiedot')."</h1>";
 						$yhtsumma = $suoritus['lyhennys'] + $suoritus['korko'];
 				
 						$k++;
+                                               
 						$kokosumma = $kokosumma - $suoritus['lyhennys'];
 						
 						// muotoilut
@@ -323,7 +324,7 @@ echo "<h1>".localize('Luoton tiedot')."</h1>";
 							$jaljella = number_format(($jaljella), 2, '.', ' ');
 							
 							echo "<tr class='alignRight'>";
-								echo "<td>$k.</td>";
+								echo "<td>$k.tes</td>";
 								echo "<td>$erapaiva</td>";
 								echo "<td>$lyhennys&euro;</td>";
 								echo "<td>$korko&euro;</td>";
